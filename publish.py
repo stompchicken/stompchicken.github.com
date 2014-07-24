@@ -1,133 +1,179 @@
+#!/usr/bin/python
 import argparse
-import markdown
 import codecs
 import os
+import os.path
 import logging
-import jinja2
 import shutil
 import sys
 import time
 import logging
-from watchdog.observers import Observer
-import watchdog
 import glob
+import datetime
 import dateutil.parser
+import shutil
 
-class IndexedDocument(object):
-    """A document to be added to a auto-generated index page"""
-    def __init__(self, path):
-        self.path = path
-        directory, self.filename = os.path.split(path)
-        self.basename, self.extension = os.path.splitext(self.filename)
-        with codecs.open(path, "r", encoding="utf-8") as f:
-            md = markdown.Markdown(extensions=['meta'])
-            doc = md.convert(f.read())
-        if 'index' in md.Meta:
-            self.valid = False
-        else:
-            self.title = md.Meta.get('title', ['Untitled'])[0]
-            self.summary = md.Meta.get('title', ['What we cannot speak of must be passed over in silence'])[0]
-            self.date = md.Meta.get('date', ['40,000AD'])[0]
-            self.valid = True
+import watchdog
+from watchdog.observers import Observer
+import jinja2
+import markdown
 
-class Document(object):
-    """A markdown page"""
-    def __init__(self, directory, filename):
-        self.directory = directory
-        self.filename = filename # filename with extension
-        self.basename, self.extension = os.path.splitext(filename)
-        self.path = os.path.join(directory, filename)
+"""
 
-    def publish(self, base_url):
-        logging.info('Convert: %s' % self.path)
+Article meta
 
-        if self.extension == ".md":
-            target_path = os.path.join(self.directory, self.basename + ".html")
-            md = markdown.Markdown(extensions=['meta', 'fenced_code', 'codehilite', 'footnotes', 'tables'])
+title - the html head/title
+template - the jinja template used
 
-            # Convert markdown
-            with codecs.open(self.path, "r", encoding="utf-8") as input_file:
-                body = md.convert(input_file.read())
-
-            # Get page title from metadata otherwise use filename
-            title = self.basename
-            if 'title' in md.Meta:
-                title = md.Meta['title'][0]
-                print title
-
-            # Generate index page, if indicated in the metadata
-            index = ''
-            if 'index' in md.Meta:
-                logging.info("Generating index page")
-
-                template_name = "index_entry.jinja"
-                template = jinja_env.get_template(template_name)
-
-                docs = []
-                for f in glob.glob(os.path.join(self.directory, "*.md")):
-                    doc = IndexedDocument(f)
-                    if doc.valid:
-                        docs.append(doc)
-
-                date_doc = [(dateutil.parser.parse(doc.date), doc) for doc in docs]
+"""
 
 
-                for date, doc in sorted(date_doc, reverse=True):
-                    index += template.render({"title": doc.title, "summary": doc.summary, "date": doc.date, "filename": doc.basename+".html"})
+def copy_file(source_dir, target_dir, rel_path):
+    source_path = os.path.join(source_dir, rel_path)
+    target_path = os.path.join(target_dir, rel_path)
+    if not os.path.exists(os.path.dirname(target_path)):
+        os.makedirs(os.path.dirname(target_path))
+    shutil.copyfile(source_path, target_path)
+    logging.info('Copy:\t%s' % rel_path)
 
-            # Load template
-            template_name = "default.jinja"
-            if 'template' in md.Meta:
-                template_name = md.Meta['template'][0]
-            template = jinja_env.get_template(template_name)
-            html = template.render({"body": body, "base_url": base_url, "title": title, "index": index})
+def convertMarkdown(source_dir, target_dir, relpath, base_url, indexer):
 
-            # Save the generate HTML
-            with codecs.open(target_path, "w+", encoding="utf-8") as output_file:
-                output_file.write(html)
+    source_path = os.path.join(source_dir, relpath)
+    basename, extension = os.path.splitext(relpath)
+    target_path = os.path.join(target_dir, basename + ".html")
+
+    logging.info('Convert:\t%s' % relpath)
+
+    # Convert markdown
+    md = markdown.Markdown(extensions=['meta', 'fenced_code', 'codehilite', 'footnotes', 'tables'])
+    with codecs.open(source_path, "r", encoding="utf-8") as input_file:
+        body = md.convert(input_file.read())
+
+    # Get page title from metadata
+    if 'title' not in md.Meta:
+        logging.error("No title field in metadata")
+        return
+    title = md.Meta['title'][0]
+
+    # Get category
+    if 'category' not in md.Meta:
+        logging.warning("No category field in metadata")
+        category = "Other stuff"
+    else:
+        category = md.Meta['category'][0]
+
+    # Get last modified date
+    timestamp = time.gmtime(os.path.getmtime(source_path))
+    last_modified = time.strftime("%a, %d %b %Y", timestamp)
+
+    # Load template
+    template_name = "default.jinja"
+    if 'template' in md.Meta:
+        template_name = md.Meta['template'][0]
+    template = jinja_env.get_template(template_name)
+    html = template.render({"body": body, "base_url": base_url, "title": title})
+
+    # Save the generated HTML
+    if not os.path.exists(os.path.dirname(target_path)):
+        os.makedirs(os.path.dirname(target_path))
+
+    with codecs.open(target_path, "w+", encoding="utf-8") as output_file:
+        output_file.write(html)
+
+    if indexer:
+        indexer.add_document({"title": title, "category": category, "last_edited": last_modified})
+
+def publish(path, source_dir, target_dir, base_url, indexer):
+    # Path of file relative to the source directory
+    rel_path = os.path.relpath(path, source_dir)
+    directory, filename = os.path.split(path)
+    basename, extension = os.path.splitext(filename)
+    if extension == ".md":
+        convertMarkdown(source_dir, target_dir, rel_path, base_url, indexer)
+    elif extension in ['.css', '.png', '.jpg']:
+        copy_file(source_dir, target_dir, rel_path)
+
+class Indexer(object):
+    def __init__(self):
+        self.docs = []
+
+    def add_document(self, doc):
+        self.docs.append(doc)
+
+    def generate(self, target_dir, base_url):
+        logging.info("Index:\t%d documents" % len(self.docs))
+        # Load template
+        template_name = "index.jinja"
+        template = jinja_env.get_template(template_name)
+
+        print self.docs
+        html = template.render({"docs": self.docs, "base_url": base_url})
+
+        # Save the generated HTML
+        target_path = os.path.join(target_dir, "index.html")
+        with codecs.open(target_path, "w+", encoding="utf-8") as output_file:
+            output_file.write(html)
 
 class FileEventHandler(watchdog.events.FileSystemEventHandler):
     """Publish HTML in response to updates to the file system"""
-    def __init__(self, source_dir, base_url):
+    def __init__(self, source_dir, target_dir, base_url):
         self.source_dir = source_dir
+        self.target_dir = target_dir
         self.base_url = base_url
 
     def on_any_event(self, event):
-        self.publish()
-
-    def publish(self):
-        logging.info("Reconvert source directory...")
-        for root, dirs, files in os.walk(self.source_dir):
-            for filename in files:
-                doc = Document(root, filename)
-                doc.publish(self.base_url)
-
+        if event.is_directory:
+            return
+        else:
+            publish(event.src_path, self.source_dir, self.target_dir, self.base_url, None)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    FORMAT = '[%(levelname)s]%(message)s'
+    logging.basicConfig(level=logging.DEBUG, format=FORMAT)
 
-    parser = argparse.ArgumentParser(description='Corrupt the media and then lie about it')
+    parser = argparse.ArgumentParser(description='Static site generator')
     parser.add_argument('source', type=unicode, help='Source directory')
-    parser.add_argument('--base_url', type=unicode, help='Base url')
+    parser.add_argument('target', type=unicode, help='Destination directory')
+    parser.add_argument('-b', '--base_url', type=unicode, help='Base url')
+    parser.add_argument('-w', '--watchdog', help='Watchdog mode', action='store_true')
     args = parser.parse_args()
 
     base_dir = os.getcwd()
     source_dir = os.path.join(base_dir, args.source)
-    base_url = args.base_url or base_dir
+    target_dir = os.path.join(base_dir, args.target)
+    base_url = args.base_url or os.path.join(base_dir, args.target)
+
+    logging.debug("Source:"+source_dir)
+    logging.debug("Target:"+target_dir)
+
+    if os.path.exists(target_dir):
+        logging.debug("Wiping out target directory")
+        shutil.rmtree(target_dir)
 
     # Initialise jinja
-    template_loader = jinja2.FileSystemLoader(searchpath="templates")
+    template_loader = jinja2.FileSystemLoader(searchpath=os.path.join(args.source, "templates"))
     jinja_env = jinja2.Environment(loader=template_loader)
 
+    # Do a complete publish of source directory
+    indexer = Indexer()
+    for root, dirs, files in os.walk(source_dir):
+        for filename in files:
+            publish(os.path.join(source_dir, root, filename), source_dir, target_dir, base_url, indexer)
+    indexer.generate(target_dir, base_url)
+
     # Monitor file system and re-publish on filesystem changes
-    handler = FileEventHandler(source_dir, base_url)
-    handler.publish()
-    observer = Observer()
-    observer.schedule(handler, path=base_dir, recursive=True)
-    observer.start()
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-        observer.join()
+    if args.watchdog:
+        logging.info("Entering watchdog mode...")
+        observer = Observer()
+        handler = FileEventHandler(source_dir, target_dir, base_url)
+        observer.schedule(handler, path=base_dir, recursive=True)
+        observer.start()
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            logging.debug("Caught CTRL-C")
+            observer.stop()
+            observer.join()
+
+    logging.debug("Terminating")

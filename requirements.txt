@@ -1,0 +1,5 @@
+python-dateutil
+watchdog
+jinja2
+markdown
+pygments
