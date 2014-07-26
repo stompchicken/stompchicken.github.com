@@ -12,6 +12,8 @@ import glob
 import datetime
 import dateutil.parser
 import shutil
+import SimpleHTTPServer
+import SocketServer
 
 import watchdog
 from watchdog.observers import Observer
@@ -24,9 +26,10 @@ Article meta
 
 title - the html head/title
 template - the jinja template used
-
+category - what to group it under
 """
 
+site_name = "You should have killed me whan you had the chance"
 
 def copy_file(source_dir, target_dir, rel_path):
     source_path = os.path.join(source_dir, rel_path)
@@ -45,7 +48,7 @@ def convertMarkdown(source_dir, target_dir, relpath, base_url, indexer):
     logging.info('Convert:\t%s' % relpath)
 
     # Convert markdown
-    md = markdown.Markdown(extensions=['meta', 'fenced_code', 'codehilite', 'footnotes', 'tables'])
+    md = markdown.Markdown(extensions=['meta', 'fenced_code', 'codehilite(guess_lang=False)', 'footnotes', 'tables'])
     with codecs.open(source_path, "r", encoding="utf-8") as input_file:
         body = md.convert(input_file.read())
 
@@ -64,14 +67,29 @@ def convertMarkdown(source_dir, target_dir, relpath, base_url, indexer):
 
     # Get last modified date
     timestamp = time.gmtime(os.path.getmtime(source_path))
-    last_modified = time.strftime("%a, %d %b %Y", timestamp)
+    last_modified = time.strftime("%d %b %Y", timestamp)
+
+    # Get slug
+    slug = basename + ".html"
+    if slug.endswith("index.html"):
+        slug = slug.replace("index.html", "")
 
     # Load template
-    template_name = "default.jinja"
+    template_name = "article.jinja"
     if 'template' in md.Meta:
         template_name = md.Meta['template'][0]
     template = jinja_env.get_template(template_name)
-    html = template.render({"body": body, "base_url": base_url, "title": title})
+
+    doc = {
+        "body": body,
+        "base_url": base_url,
+        "title": title,
+        "category": category,
+        "slug": slug,
+        "last_modified": last_modified,
+        "use_MathJax": "$" in body
+    }
+    html = template.render(doc)
 
     # Save the generated HTML
     if not os.path.exists(os.path.dirname(target_path)):
@@ -81,16 +99,18 @@ def convertMarkdown(source_dir, target_dir, relpath, base_url, indexer):
         output_file.write(html)
 
     if indexer:
-        indexer.add_document({"title": title, "category": category, "last_edited": last_modified})
+        indexer.add_document(doc)
 
 def publish(path, source_dir, target_dir, base_url, indexer):
     # Path of file relative to the source directory
     rel_path = os.path.relpath(path, source_dir)
     directory, filename = os.path.split(path)
     basename, extension = os.path.splitext(filename)
-    if extension == ".md":
+    if basename.startswith("."):
+        pass
+    elif extension == ".md":
         convertMarkdown(source_dir, target_dir, rel_path, base_url, indexer)
-    elif extension in ['.css', '.png', '.jpg']:
+    elif extension in ['.css', '.png', '.jpg', '.woff', '.js']:
         copy_file(source_dir, target_dir, rel_path)
 
 class Indexer(object):
@@ -106,8 +126,7 @@ class Indexer(object):
         template_name = "index.jinja"
         template = jinja_env.get_template(template_name)
 
-        print self.docs
-        html = template.render({"docs": self.docs, "base_url": base_url})
+        html = template.render({"docs": self.docs, "base_url": base_url, "site_name": site_name})
 
         # Save the generated HTML
         target_path = os.path.join(target_dir, "index.html")
@@ -128,7 +147,7 @@ class FileEventHandler(watchdog.events.FileSystemEventHandler):
             publish(event.src_path, self.source_dir, self.target_dir, self.base_url, None)
 
 if __name__ == '__main__':
-    FORMAT = '[%(levelname)s]%(message)s'
+    FORMAT = '[%(levelname)s] %(message)s'
     logging.basicConfig(level=logging.DEBUG, format=FORMAT)
 
     parser = argparse.ArgumentParser(description='Static site generator')
@@ -141,7 +160,7 @@ if __name__ == '__main__':
     base_dir = os.getcwd()
     source_dir = os.path.join(base_dir, args.source)
     target_dir = os.path.join(base_dir, args.target)
-    base_url = args.base_url or os.path.join(base_dir, args.target)
+    base_url = args.base_url or ""
 
     logging.debug("Source:"+source_dir)
     logging.debug("Target:"+target_dir)
@@ -168,12 +187,23 @@ if __name__ == '__main__':
         handler = FileEventHandler(source_dir, target_dir, base_url)
         observer.schedule(handler, path=base_dir, recursive=True)
         observer.start()
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logging.debug("Caught CTRL-C")
+
+    current_dir = os.getcwd()
+    try:
+        os.chdir(target_dir)
+        port = 8000
+        handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+        httpd = SocketServer.TCPServer(("", port), handler)
+        logging.info("Starting server at port: %d" % port)
+        while True:
+            httpd.handle_request()
+
+    except KeyboardInterrupt:
+        logging.debug("Caught CTRL-C")
+        logging.info("Shutting down server at port: %d" % port)
+        if args.watchdog:
             observer.stop()
             observer.join()
 
     logging.debug("Terminating")
+    os.chdir(current_dir)
