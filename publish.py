@@ -32,6 +32,7 @@ category - what to group it under
 site_name = "You should have killed me whan you had the chance"
 
 def copy_file(source_dir, target_dir, rel_path):
+    """Copies file from source to target"""
     source_path = os.path.join(source_dir, rel_path)
     target_path = os.path.join(target_dir, rel_path)
     if not os.path.exists(os.path.dirname(target_path)):
@@ -40,6 +41,8 @@ def copy_file(source_dir, target_dir, rel_path):
     logging.info('Copy:\t%s' % rel_path)
 
 def convertMarkdown(source_dir, target_dir, relpath, base_url, indexer):
+    """Converts a markdown document in the source directory to an HTML
+    document in the target directory"""
 
     source_path = os.path.join(source_dir, relpath)
     basename, extension = os.path.splitext(relpath)
@@ -98,7 +101,7 @@ def convertMarkdown(source_dir, target_dir, relpath, base_url, indexer):
     with codecs.open(target_path, "w+", encoding="utf-8") as output_file:
         output_file.write(html)
 
-    if indexer:
+    if indexer and category != "noindex":
         indexer.add_document(doc)
 
 def publish(path, source_dir, target_dir, base_url, indexer):
@@ -114,6 +117,7 @@ def publish(path, source_dir, target_dir, base_url, indexer):
         copy_file(source_dir, target_dir, rel_path)
 
 class Indexer(object):
+    """Keeps a record of all published documents and compiles and index page"""
     def __init__(self):
         self.docs = []
 
@@ -148,7 +152,7 @@ class FileEventHandler(watchdog.events.FileSystemEventHandler):
 
 if __name__ == '__main__':
     FORMAT = '[%(levelname)s] %(message)s'
-    logging.basicConfig(level=logging.DEBUG, format=FORMAT)
+    logging.basicConfig(level=logging.INFO, format=FORMAT)
 
     parser = argparse.ArgumentParser(description='Static site generator')
     parser.add_argument('source', type=unicode, help='Source directory')
@@ -193,7 +197,11 @@ if __name__ == '__main__':
         os.chdir(target_dir)
         port = 8000
         handler = SimpleHTTPServer.SimpleHTTPRequestHandler
-        httpd = SocketServer.TCPServer(("", port), handler)
+        # To handle 'Address already in use error'
+        # http://stackoverflow.com/questions/10613977/
+        class MyTCPServer(SocketServer.TCPServer):
+            allow_reuse_address = True
+        httpd = MyTCPServer(("", port), handler)
         logging.info("Starting server at port: %d" % port)
         while True:
             httpd.handle_request()

@@ -23,11 +23,16 @@
     </head>
     <body>
 
-        {% block body %}{% endblock %}
+      <header>
+        <div id="home"><a href="/">Stompchicken</a></div>
+        <div id="meta"><a href="/meta.html">Meta</a></div>
+      </header>
 
-        <footer>
-            COPYRIGHT YO
-        </footer>
+      {% block body %}{% endblock %}
+
+      <footer>
+        Copyright is dumb.
+      </footer>
     </body>
 
 </html>

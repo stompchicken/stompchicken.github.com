@@ -4,12 +4,11 @@
   {{site_name}}
 {% endblock %}
 
-
 {% block body %}
-      {% for group in docs|groupby('category') %}
-          <h1>{{group.grouper}}</h1>
-          {% for doc in group.list %}
-              <p><a href="{{doc.slug}}">{{doc.title}}</a> ({{doc.last_modified}})</p>
-          {% endfor %}
-      {% endfor %}
+  {% for group in docs|groupby('category') %}
+    <h3>{{group.grouper}}</h3>
+    {% for doc in group.list %}
+      <p><a href="{{doc.slug}}">{{doc.title}}</a> ({{doc.last_modified}})</p>
+    {% endfor %}
+  {% endfor %}
 {% endblock %}
