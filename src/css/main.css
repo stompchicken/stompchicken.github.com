@@ -17,14 +17,21 @@ body {
 }
 
 h1, h2, h3, h4, h5, p {
-	padding: 8px;
+	padding: 8px 0px;
 	margin: 0px;
 }
 
+h1 { font-size: 20pt; }
+h2 { font-size: 18pt; }
+h3 { font-size: 16pt; }
+h4 { font-size: 14pt; }
+h5 { font-size: 12pt; }
+
 p {
 	font-size: 13pt;
-	line-height: 200%;
-	margin-bottom: 8px;
+	line-height: 180%;
+    padding: 16px 0px;
+/*	margin-bottom: 8px; */
 }
 
 blockquote {
@@ -33,6 +40,10 @@ blockquote {
 	border-color: black;
 	border-style: solid;
 	border-width: 1px;
+}
+
+blockquote p {
+    padding: 8px;
 }
 
 img {
@@ -52,7 +63,32 @@ li {
 	width: 80%;
 }
 
+table {
+
+    margin: 0px auto;
+    border-color: black;
+    border-width: 1px;
+    border-style: solid;
+    padding: 8px;
+}
+
+th {
+    padding: 4px 16px;
+}
+
+td {
+    padding: 4px 16px;
+}
+
+#home {
+    width: 80%;
+    float: left;
+}
+
 #meta {
+    width: 20%;
+    float: right;
+    text-align: right;
 }
 
 .image-caption {
@@ -61,12 +97,19 @@ li {
 }
 
 header {
+	font-size: 14pt;
 	border-color: black;
 	border-style: solid;
 	border-width: 0px;
 	border-bottom-width: 1px;
-	padding: 0.5em 0em;
+	padding: 12px 0px;
 	color: #a0a0a0;
+    margin-bottom: 32px;
+}
+
+header a {
+    text-decoration: none;
+    color: #ff0060;
 }
 
 footer {
@@ -74,8 +117,13 @@ footer {
 	border-style: solid;
 	border-width: 0px;
 	border-top-width: 1px;
-	padding: 0.5em 0em;
+	padding: 12px 0px;
 	color: #a0a0a0;
+    margin-top: 32px;
 }
 
+.codehilite {
 
+    margin: 32px 8px;
+
+}

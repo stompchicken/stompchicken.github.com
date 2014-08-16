@@ -29,7 +29,7 @@ template - the jinja template used
 category - what to group it under
 """
 
-site_name = "You should have killed me whan you had the chance"
+site_name = "You should have killed me when you had the chance"
 
 class Publisher(object):
 
@@ -121,6 +121,7 @@ class Publisher(object):
         template = self.jinja_env.get_template(template_name)
 
         doc = {
+            "site_name": site_name,
             "body": body,
             "base_url": base_url,
             "title": title,
@@ -206,7 +207,7 @@ if __name__ == '__main__':
         logging.info("Entering watchdog mode...")
         observer = Observer()
         handler = FileEventHandler(publisher)
-        observer.schedule(handler, path=base_dir, recursive=True)
+        observer.schedule(handler, path=source_dir, recursive=True)
         observer.start()
 
     current_dir = os.getcwd()
