@@ -16,7 +16,21 @@ this was shown independently by James Dow Allen and Victor Allis in the late
 
 * It's interesting to do something even if someone has done it before.
 * It's better tested and better explained
-* I learned a lot about performance tuning algon the way.
+* I learned a lot about performance tuning algon the way
+ 
+Sketch TOC
+----------
+
+* Minimax and alphabeta: pseudo-code
+* Bitboards: micro-benchmarks for evaluate and isTerminal
+* Caching: micro-benchmarks for get and set, given probe size (plus some reasonning about cache latency to a max-speed per node). Macro-benchmark for reduced problem, depth-based replacement scheme, max-depth
+* Pruning: Macro-benchmarks for killer, LR symmetry, static move ordering, breadth-first filter
+* Other optimisations
+* Notes on testing
+* Conclusion
+* Appendix A: Improving alpha-beta
+* Appendix B: Parallelising alpha-beta
+
 
 Minimax
 -------
