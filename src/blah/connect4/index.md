@@ -23,8 +23,8 @@ Sketch TOC
 
 * Minimax and alphabeta: pseudo-code
 * Bitboards: micro-benchmarks for evaluate and isTerminal
-* Caching: micro-benchmarks for get and set, given probe size (plus some reasonning about cache latency to a max-speed per node). Macro-benchmark for reduced problem, depth-based replacement scheme, max-depth
-* Pruning: Macro-benchmarks for killer, LR symmetry, static move ordering, breadth-first filter
+* Caching: micro-benchmarks for get and set, given probe size (plus some reasonning about cache latency to a max-speed per node). Macro-benchmark for hash-map size, reduced problem, depth-based replacement scheme, max-depth
+* Pruning: Macro-benchmarks for killer, history, LR symmetry, static move ordering, breadth-first filter
 * Other optimisations
 * Notes on testing
 * Conclusion
@@ -93,26 +93,7 @@ An implementation of alpha-beta that takes advantage of this:
 
             return value
 
-If you look at things written about chess programming, the most
-promising improvements to alpha-beta are either parallelisation of
-regular alpha-beta or an algorithm called
-[MTD(f)](http://en.wikipedia.org/wiki/MTD-f) which is supposed to be
-more efficient.
-
-Parallelisation of alpha-beta is not a particularly straightforward
-thing. The introduction of a pruning step after exploring each child
-state makes the algorithm explicitly serial, **that's why it's fast in
-the first place**. In order to be able to parallelise alpha-beta you
-have to be willing to give up on (at least some of) that pruning.
-
-For me, MTD(f) was not an algorithm that made a lot of sense to me,
-even after reading several detailed explanations. However, as
-sometimes happens, the original paper on the algorithm gives by far
-the best explanation of MTD(f). My brief summary is this: alpha-beta
-is fastest when the space between alpha and beta is small (called the
-search window). A small search window means more cutoffs and a smaller
-time to complete but is also likely to be unhelpful if the true value
-doesn't lie between alpha and beta.
+This is the basis of the solver, although we will add many optimisations before we have something that does what we want.
 
 Bitboards
 ---------
@@ -359,7 +340,7 @@ evaluate and the rest went somewhere else.
 Conclusion
 ==========
 
- * Harder than I thought
+ * Harder than I thought, mostly an implementation exercise
  * A game of orders of magnitude, speedups of any less that 5x not
    really worth the time
  * Pruning is king
