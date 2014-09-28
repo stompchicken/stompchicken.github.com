@@ -31,6 +31,11 @@ Sketch TOC
 * Appendix A: Improving alpha-beta
 * Appendix B: Parallelising alpha-beta
 
+Benchmarking
+------------
+
+4.5x10^12 7x6
+2.8x10^09 6x5
 
 Minimax
 -------
