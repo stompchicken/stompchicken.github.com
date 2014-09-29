@@ -5,7 +5,7 @@ Category: Games
 The problem
 ===========
 
-Here's the problem:
+Okay, here's the challenge:
 
 > Solve Connect Four, exactly, on a 2012 Macbook Air in no less than eight hours.
 
@@ -37,6 +37,13 @@ Benchmarking
 4.5x10^12 7x6
 2.8x10^09 6x5
 
+Basics
+------
+
+* Game Tree
+* Game value
+* Optimal strategy
+
 Minimax
 -------
 
@@ -58,12 +65,10 @@ The first step is the [Minimax](http://en.wikipedia.org/wiki/Minimax) algorithm 
 
 The cost of the minimax algorithm in linear in the size of the game tree, but we can do better.
 
-Diagram of the game tree
-
 Alpha beta
 ----------
 
-Minimax with upper/lower bounds.
+Alpha-beta is another algorithm that computes the value of a game. It's similar to minimax except that it keeps around two numbers, alpha and beta, which are lower and upper bounds on the value of the game.
 
     ::python
     def alpha_beta(state, alpha, beta):
@@ -98,7 +103,7 @@ An implementation of alpha-beta that takes advantage of this:
 
             return value
 
-This is the basis of the solver, although we will add many optimisations before we have something that does what we want.
+This algorithm is the basis of the solver. However, a straightforward implementation of alpha-beta will take several orders of magnitude longer to solve Connect 4 than we can afford.
 
 Bitboards
 ---------
@@ -128,9 +133,8 @@ Connect Four board:
 There are two slightly odd things here. Firstly, the ordering goes up
 by rows first and then columns, which perhaps seems a little less
 natural that column first. The second is those `XX` positions, which
-correspond to indexes in the bitboard that are specially reserved to
-always contain a zero, called the zero barrier. We'll get into the
-reasons for both in a little bit.
+correspond to indexes in the bitboard that always contain a zero, 
+called the zero barrier. We'll get into the reasons for both in a little bit.
 
 Here's an example board encoding:
 
@@ -159,7 +163,7 @@ think about a bitboard `b` and the expression `(b << 2) & b`
      |.|.|X|X|X|X|.|     |.|.|.|.|.|.|.|     |.|.|.|.|.|.|.|
      |.|.|X|X|X|X|.|  &  |.|.|.|.|.|.|.|  =  |.|.|.|.|.|.|.|
 
-As you can see, we have a bit set if there is a piece with another
+We have a bit set if there is a piece with another
 pieces two positions to the left of it. Now let's do the trick again,
 this time with a shift of one bit:
 
