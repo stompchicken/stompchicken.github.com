@@ -7,8 +7,10 @@
 {% block body %}
   {% for group in docs|groupby('category') %}
     <h3>{{group.grouper}}</h3>
+    <ul>
     {% for doc in group.list %}
-      <p><a href="{{doc.slug}}">{{doc.title}}</a> ({{doc.last_modified}})</p>
+      <li><a href="{{doc.slug}}">{{doc.title}}</a> ({{doc.last_modified}})</li>
     {% endfor %}
+    </ul>
   {% endfor %}
 {% endblock %}
