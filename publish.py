@@ -12,8 +12,8 @@ import glob
 import datetime
 import dateutil.parser
 import shutil
-import SimpleHTTPServer
-import SocketServer
+import http.server
+import socketserver
 
 import watchdog
 from watchdog.observers import Observer
@@ -29,7 +29,7 @@ template - the jinja template used
 category - what to group it under
 """
 
-site_name = "You should have killed me when you had the chance"
+site_name = "Loss and regret"
 
 class Publisher(object):
 
@@ -179,9 +179,9 @@ class FileEventHandler(watchdog.events.FileSystemEventHandler):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Static site generator')
-    parser.add_argument('source', type=unicode, help='Source directory')
-    parser.add_argument('target', type=unicode, help='Destination directory')
-    parser.add_argument('-b', '--base_url', type=unicode, help='Base url')
+    parser.add_argument('source', type=str, help='Source directory')
+    parser.add_argument('target', type=str, help='Destination directory')
+    parser.add_argument('-b', '--base_url', type=str, help='Base url')
     parser.add_argument('-w', '--watchdog', help='Watchdog mode', action='store_true')
     parser.add_argument('-d', '--debug', help='Debug logging', action='store_true')
     args = parser.parse_args()
@@ -214,10 +214,10 @@ if __name__ == '__main__':
     try:
         os.chdir(target_dir)
         port = 8000
-        handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+        handler = http.server.SimpleHTTPRequestHandler
         # To handle 'Address already in use error'
         # http://stackoverflow.com/questions/10613977/
-        class MyTCPServer(SocketServer.TCPServer):
+        class MyTCPServer(socketserver.TCPServer):
             allow_reuse_address = True
         httpd = MyTCPServer(("", port), handler)
         logging.info("Starting server at port: %d" % port)
