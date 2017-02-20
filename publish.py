@@ -27,6 +27,8 @@ Article meta
 title - the html head/title
 template - the jinja template used
 category - what to group it under
+summary
+date
 """
 
 site_name = "Loss and regret"
@@ -66,7 +68,7 @@ class Publisher(object):
             pass
         elif extension == ".md":
             self.convert_markdown(path, indexer)
-        elif extension in ['.css', '.png', '.jpg', '.js', '.ico']:
+        elif extension in ['.css', '.png', '.jpg', '.js', '.ico', '.json']:
             self.copy_file(path)
 
     def copy_file(self, path):
@@ -100,10 +102,22 @@ class Publisher(object):
 
         # Get category
         if 'category' not in md.Meta:
-            logging.warning("No category field in metadata")
-            category = "Other stuff"
+            category = ""
         else:
             category = md.Meta['category'][0]
+
+        # Get summary
+        if 'summary' not in md.Meta:
+            summary = ""
+        else:
+            summary = md.Meta['summary'][0]
+
+        # Get date
+        if 'date' not in md.Meta:
+            logging.error("No title field in metadata")
+            date = None
+        else:
+            date = md.Meta['date'][0]
 
         # Get last modified date
         timestamp = time.gmtime(os.path.getmtime(source_path))
@@ -127,7 +141,8 @@ class Publisher(object):
             "title": title,
             "category": category,
             "slug": slug,
-            "last_modified": last_modified,
+            "summary": summary,
+            "date": date,
             # A crude check to speed up non-maths pages
             "use_MathJax": "$" in body
         }
@@ -144,7 +159,7 @@ class Publisher(object):
             indexer.add_document(doc)
 
 class Indexer(object):
-    """Keeps a record of all published documents and compiles and index page"""
+    """Keeps a record of all published documents and compiles an index page"""
     def __init__(self):
         self.docs = []
 
