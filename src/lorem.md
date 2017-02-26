@@ -1,5 +1,5 @@
 Title: Lorem Ipsum
-Category: Testing
+Category: __noindex
 
 # 1. Est et et Ichnobates spectans multae abundet
 

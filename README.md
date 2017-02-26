@@ -1,5 +1,3 @@
-
-
 How to setup your Python environment
 ------------------------------------
 
@@ -12,6 +10,11 @@ How to setup your Python environment
 How to publish
 --------------
 
-    python publish.py src site -w
+    python publish.py src site
+
+How to develop
+--------------
+
+python publish.py src site -w
 
 Open browser at [localhost:8000]()

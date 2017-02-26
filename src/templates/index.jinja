@@ -9,7 +9,10 @@
     <h3>{{group.grouper}}</h3>
     <ul>
     {% for doc in group.list %}
-      <li><a href="{{doc.slug}}">{{doc.title}}</a> ({{doc.last_modified}})</li>
+      <li>
+        <a href="{{doc.slug}}">{{doc.title}}</a> {% if "date" in doc %} ({{doc.date}}) {% endif %} {% if "summary" in doc %}
+        <div class="summary">{{doc.summary}}</div> {% endif %}
+      </li>
     {% endfor %}
     </ul>
   {% endfor %}

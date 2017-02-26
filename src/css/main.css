@@ -59,8 +59,9 @@ ol, ul {
 }
 
 li {
+    font-size: 13pt;
 	padding: 0.5em 0em;
-	width: 80%;
+	width: 90%;
 }
 
 table {
@@ -80,6 +81,15 @@ td {
     padding: 4px 16px;
 }
 
+hr {
+    border-width: 0;
+    width: 80%;
+    margin: 48px auto;
+    height: 1px;
+    background: #000000;
+
+}
+
 #home {
     width: 80%;
     float: left;
@@ -89,6 +99,10 @@ td {
     width: 20%;
     float: right;
     text-align: right;
+}
+
+.summary {
+	color: #808080;
 }
 
 .image-caption {
@@ -122,8 +136,11 @@ footer {
     margin-top: 32px;
 }
 
+.footnote p {
+    font-size: 10pt;
+    padding: 0px;
+}
+
 .codehilite {
-
     margin: 32px 8px;
-
 }

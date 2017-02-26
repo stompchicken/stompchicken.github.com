@@ -14,24 +14,16 @@ import dateutil.parser
 import shutil
 import http.server
 import socketserver
+import mimetypes
+import boto3
+import botocore
 
 import watchdog
 from watchdog.observers import Observer
 import jinja2
 import markdown
 
-"""
-
-Article meta
-
-title - the html head/title
-template - the jinja template used
-category - what to group it under
-summary
-date
-"""
-
-site_name = "Loss and regret"
+site_name = "On loss and regret"
 
 class Publisher(object):
 
@@ -94,30 +86,20 @@ class Publisher(object):
         with codecs.open(source_path, "r", encoding="utf-8") as input_file:
             body = md.convert(input_file.read())
 
-        # Get page title from metadata
-        if 'title' not in md.Meta:
-            logging.error("No title field in metadata")
-            return
-        title = md.Meta['title'][0]
 
-        # Get category
-        if 'category' not in md.Meta:
-            category = ""
-        else:
-            category = md.Meta['category'][0]
+        def convert_metadata_field(md, metadata, field_name, path, required=False):
+            if field_name not in md.Meta:
+                if required:
+                    logging.error("No '%s' field in metadata for file: %s" % (field_name, path))
+            else:
+                metadata[field_name] = md.Meta[field_name][0]
 
-        # Get summary
-        if 'summary' not in md.Meta:
-            summary = ""
-        else:
-            summary = md.Meta['summary'][0]
 
-        # Get date
-        if 'date' not in md.Meta:
-            logging.error("No title field in metadata")
-            date = None
-        else:
-            date = md.Meta['date'][0]
+        metadata = {}
+        convert_metadata_field(md, metadata, "title", path, True)
+        convert_metadata_field(md, metadata, "category", path, True)
+        convert_metadata_field(md, metadata, "summary", path)
+        convert_metadata_field(md, metadata, "date", path)
 
         # Get last modified date
         timestamp = time.gmtime(os.path.getmtime(source_path))
@@ -138,14 +120,11 @@ class Publisher(object):
             "site_name": site_name,
             "body": body,
             "base_url": base_url,
-            "title": title,
-            "category": category,
             "slug": slug,
-            "summary": summary,
-            "date": date,
             # A crude check to speed up non-maths pages
             "use_MathJax": "$" in body
         }
+        doc.update(metadata)
         html = template.render(doc)
 
         # Save the generated HTML
@@ -155,7 +134,7 @@ class Publisher(object):
         with codecs.open(target_path, "w+", encoding="utf-8") as output_file:
             output_file.write(html)
 
-        if indexer and category != "noindex":
+        if indexer:
             indexer.add_document(doc)
 
 class Indexer(object):
@@ -164,7 +143,8 @@ class Indexer(object):
         self.docs = []
 
     def add_document(self, doc):
-        self.docs.append(doc)
+        if doc["category"] != "__noindex":
+            self.docs.append(doc)
 
     def generate(self, jinja_env, target_root, base_url):
         logging.info("Index:\t%d documents" % len(self.docs))
@@ -182,23 +162,54 @@ class Indexer(object):
 
 class FileEventHandler(watchdog.events.FileSystemEventHandler):
     """Publish HTML in response to updates to the file system"""
-    def __init__(self, publisher):
+    def __init__(self, publisher, reindex=True):
         self.publisher = publisher
+        self.reindex = reindex
 
     def on_any_event(self, event):
         if event.is_directory:
             return
         else:
             path = os.path.relpath(event.src_path, self.publisher.source_root)
-            self.publisher.publish_file(path, None)
+            if self.reindex:
+                logging.info("Reindexing...")
+                self.publisher.publish_all()
+            else:
+                logging.info("Regenerating %s" % path)
+                self.publisher.publish_file(path, None)
+
+def upload_to_s3(s3, site, source, dest):
+    args = {
+        "ACL": "public-read",
+        "ContentType": mimetypes.guess_type(source)[0],
+        "StorageClass": "REDUCED_REDUNDANCY"
+    }
+    logging.info("Uploading: '%s' --> '%s'" % (source, dest))
+    s3.Object('www.stompchicken.com', dest).upload_file(source, ExtraArgs=args)
+
+def upload_site(base):
+    s3 = boto3.resource('s3')
+
+    site_dir = "site"
+    for dirpath, dirnames, filenames in os.walk(site_dir):
+        relative_dir = os.path.relpath(dirpath, site_dir)
+        if relative_dir == ".":
+            relative_dir = ""
+
+        for filename in filenames:
+            source = os.path.join(dirpath, filename)
+            dest = os.path.join(base, relative_dir, filename)
+            upload_to_s3(s3, 'www.stompchicken.com', source, dest)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Static site generator')
     parser.add_argument('source', type=str, help='Source directory')
     parser.add_argument('target', type=str, help='Destination directory')
-    parser.add_argument('-b', '--base_url', type=str, help='Base url')
+    parser.add_argument('-b', '--base', type=str, help='Base link')
     parser.add_argument('-w', '--watchdog', help='Watchdog mode', action='store_true')
+    parser.add_argument('-i', '--reindex', help='Reindex in watchdog', action='store_true')
     parser.add_argument('-d', '--debug', help='Debug logging', action='store_true')
+    parser.add_argument('-u', '--upload', help='Upload', action='store_true')
     args = parser.parse_args()
 
     # Set up logging
@@ -208,7 +219,9 @@ if __name__ == '__main__':
     base_dir = os.getcwd()
     source_dir = os.path.join(base_dir, args.source)
     target_dir = os.path.join(base_dir, args.target)
-    base_url = args.base_url or ""
+    base_url = args.base or ""
+    if not base_url.startswith("/") and base_url != "":
+        base_url = "/" + base_url
 
     logging.debug("Source:"+source_dir)
     logging.debug("Target:"+target_dir)
@@ -221,30 +234,33 @@ if __name__ == '__main__':
     if args.watchdog:
         logging.info("Entering watchdog mode...")
         observer = Observer()
-        handler = FileEventHandler(publisher)
+        handler = FileEventHandler(publisher, args.reindex)
         observer.schedule(handler, path=source_dir, recursive=True)
         observer.start()
 
-    current_dir = os.getcwd()
-    try:
-        os.chdir(target_dir)
-        port = 8000
-        handler = http.server.SimpleHTTPRequestHandler
-        # To handle 'Address already in use error'
-        # http://stackoverflow.com/questions/10613977/
-        class MyTCPServer(socketserver.TCPServer):
-            allow_reuse_address = True
-        httpd = MyTCPServer(("", port), handler)
-        logging.info("Starting server at port: %d" % port)
-        while True:
-            httpd.handle_request()
+        current_dir = os.getcwd()
+        try:
+            os.chdir(target_dir)
+            port = 8000
+            handler = http.server.SimpleHTTPRequestHandler
+            # To handle 'Address already in use error'
+            # http://stackoverflow.com/questions/10613977/
+            class MyTCPServer(socketserver.TCPServer):
+                allow_reuse_address = True
+            httpd = MyTCPServer(("", port), handler)
+            logging.info("Starting server at port: %d" % port)
+            while True:
+                httpd.handle_request()
 
-    except KeyboardInterrupt:
-        logging.debug("Caught CTRL-C")
-        logging.info("Shutting down server at port: %d" % port)
-        if args.watchdog:
-            observer.stop()
-            observer.join()
+        except KeyboardInterrupt:
+            logging.debug("Caught CTRL-C")
+            logging.info("Shutting down server at port: %d" % port)
+            if args.watchdog:
+                observer.stop()
+                observer.join()
 
-    logging.debug("Terminating")
-    os.chdir(current_dir)
+        logging.debug("Terminating")
+        os.chdir(current_dir)
+
+    if args.upload:
+        upload_site(args.base or "")
