@@ -60,7 +60,7 @@ class Publisher(object):
             pass
         elif extension == ".md":
             self.convert_markdown(path, indexer)
-        elif extension in ['.css', '.png', '.jpg', '.js', '.ico', '.json']:
+        elif extension in ['.css', '.png', '.jpg', '.js', '.ico', '.json', '.svg']:
             self.copy_file(path)
 
     def copy_file(self, path):
