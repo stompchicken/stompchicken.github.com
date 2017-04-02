@@ -24,53 +24,13 @@ The solving of games
 
 Very quick summary of game theory
 
-Minimax
--------
-
-The simplest approach to solving a game
-the [Minimax](http://en.wikipedia.org/wiki/Minimax) algorithm.
-
-    :::python
-    def minimax(state):
-        if state.is_terminal():
-            return state.evaluate()
-        else:
-            value = VALUE_MAX if state.player == PLAYER_MIN else VALUE_MIN
-            for child in state.children:
-                child_value = minimax(child)
-                if state.player == PLAYER_MAX:
-                    value = max(child_value, value)
-                else:
-                    value = min(child_value, value)
-            return value
-
-The minimax algorithm will explore every node in the game tree.
-
 Alpha beta
 ----------
 
 A more efficient approach in practice is the [Alpha-beta]()
-algorithm. It's similar to minimax except it takes parameters alpha and
-beta, which are lower and upper bounds on the value of the game. A
-very stupid implementation of alpha-beta would look like:
-
-    ::python
-    def alpha_beta(state, alpha, beta):
-        value = minimax(state)
-        if value < alpha:
-            return alpha
-        elif value > beta:
-            return beta
-        else:
-            return value
-
-The important thing here is that alpha-beta has fewer responsibilities
-than minimax: it no longer always needs to return the value of a
-state, if it can prove the value lies outside the bounds it can just
-give up early. This is called a cutoff and it's very important in
-making alpha-beta fast.
-
-An implementation of alpha-beta that actually takes advantage of this is:
+algorithm. It's similar to minimax except it takes parameters alpha
+and beta, which are lower and upper bounds on the value of the
+game. An implementation of alpha-beta might look like this:
 
     ::python
     def alpha_beta(state, alpha, beta):
@@ -87,6 +47,12 @@ An implementation of alpha-beta that actually takes advantage of this is:
 
             return value
 
+The important thing here is that alpha-beta has fewer responsibilities
+than minimax: it no longer always needs to return the value of a
+state, if it can prove the value lies outside the bounds it can just
+give up early. This is called a cutoff and it's very important in
+making alpha-beta fast.
+
 This algorithm is all you need to solve Connect Four, and when I say
 'all you need' I am missing out a large number of practical details
 that mean the difference between a runtime measured in hours and in
@@ -95,8 +61,8 @@ years.
 But this article is all about the practical details, there are four
 appendices full of details!
 
-State representation: bitboards
--------------------------------
+Making it efficient
+-------------------
 
 If we take a look at the alpha-beta algorithm above, it does two basic
 operations - tests whether a state is terminal, and generates all the
@@ -191,20 +157,22 @@ So, in summary we can:
 not bad!
 
 
-State-Value Caching
--------------------
+Putting a big cache in front of it
+----------------------------------
 
-For some game states, you can reach them from many differen sequences
-of moves.
+After making the fundamental operations of alph-beta efficient, the
+next obvious optimisation step is the time-honoured technique of
+putting a cache in front of it.
 
-In the later stages of the game, there can be a enormous number of
-possible histories for a game state. This means we will be doing a lot
+I turns out that there is a lot of duplication in the game tree, since
+it is possible to arrive at the same state through a number of
+different sequences of moves. This means we will be doing a lot
 of redudant work in the search, calculating the value of the same
 state over and over again.
 
-I took a idea from chess engines and used a caching structure that
-stores states and their values, which they call it a *transposition
-table*, but I'm just going to call a cache.
+The idea of maintaing a cache of the values of game states is an old
+one. In chess engines they call it a *transposition table*, but I'm
+just going to call a cache.
 
 The cache is implemented as a very simple hash table using
 size, [open addressing](https://en.wikipedia.org/wiki/Open_addressing)
@@ -230,12 +198,18 @@ best move | 4
 
 The key is a highly compressed representation of the game state.
 
-The depth of the game state is stored in order to easily do depth
-replacement.
+The depth of the game state is stored in the cache to allow us to do a
+smart replacement strategy. When we get a hash collision during an
+insert operation, we will replace the existing entry if it is deeper
+in the game tree than the one we are trying to insert. This is because
+depth is a pretty good proxy for 'how expensive is this node to
+evaluate'. We could always calculate the depth of the state from the
+key, but we have plenty of space to spare.
 
-The best move is to calculate the optmial startegy (never got around
-to it)
-
+I also reserved some space to store the best move in order to recover
+the optimal strategy, which was something I never got round to. I
+think the best approach is to store the optmial move for the first few
+levels in the game tree and calculate the best move for deeper nodes.
 
 I
 used [Zobrist hashing](https://en.wikipedia.org/wiki/Zobrist_hashing)
@@ -251,13 +225,12 @@ explore. On my Macbook, an uncached memory lookup takes about 100ns,
 which limits the search to a paltry **10 million nodes a
 second**. This fact would depress me for some time.
 
-Pruning
--------
+Doing less work
+---------------
 
 Adding the cache was essential but it had imposed hard speed-limit on
 the search. It was just not going to be fast enough to finish in eight
-hours, instead it was going to take *weeks*. The only option now was
-to do less work.
+hours, instead it was going to take *weeks*.
 
 For example, starting from a empty Connect Four board, let's assume
 player 1 puts their first piece in the central column. Solving from
